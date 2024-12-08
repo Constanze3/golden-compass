@@ -1,20 +1,23 @@
 package com.github.Constanze3.golden_compass;
 
+import com.mojang.logging.LogUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtOps;
-import net.minecraft.nbt.NbtUtils;
-import net.minecraft.nbt.Tag;
+import net.minecraft.nbt.*;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Vanishable;
 import net.minecraft.world.level.Level;
+import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
 
-import javax.annotation.Nullable;
 import java.util.Optional;
 
 public class GoldenCompassItem extends Item implements Vanishable {
@@ -27,21 +30,46 @@ public class GoldenCompassItem extends Item implements Vanishable {
     }
 
     @Override
-    public void inventoryTick(ItemStack itemStack, Level level, Entity entity, int slot, boolean selected) {
-        if(level.isClientSide() || !(entity instanceof ServerPlayer)) {
+    public @NotNull InteractionResult interactLivingEntity(
+            @NotNull ItemStack itemStack,
+            @NotNull Player player,
+            @NotNull LivingEntity entity,
+            @NotNull InteractionHand hand
+    ) {
+        if (entity instanceof Player otherPlayer) {
+            setTarget(itemStack.getOrCreateTag(), otherPlayer.getName().getString());
+            player.setItemInHand(hand, itemStack);
+            return InteractionResult.SUCCESS;
+        }
+
+        return  InteractionResult.FAIL;
+    }
+
+    @Override
+    public void inventoryTick(
+            @NotNull ItemStack itemStack,
+            Level level,
+            @NotNull Entity entity,
+            int slot,
+            boolean selected
+    ) {
+        if(level.isClientSide() || entity.getServer() == null) {
             return;
         }
 
         CompoundTag tag = itemStack.getOrCreateTag();
-        if (tag.contains("Target")) {
-            String target = tag.getString(TAG_TARGET);
-            ServerPlayer targetPlayer =  entity.getServer().getPlayerList().getPlayerByName(target);
+        Optional<String> target = getTarget(tag);
+
+        if (target.isPresent()) {
+            ServerPlayer targetPlayer =  entity.getServer().getPlayerList().getPlayerByName(target.get());
 
             if (targetPlayer != null) {
                 BlockPos targetPos = targetPlayer.blockPosition();
                 ResourceKey<Level> targetDimension = targetPlayer.level.dimension();
 
-                addTags(tag, targetPos, targetDimension);
+                updateTags(tag, targetPos, targetDimension);
+            } else {
+                // removeTags(tag);
             }
         }
     }
@@ -51,12 +79,28 @@ public class GoldenCompassItem extends Item implements Vanishable {
         return false;
     }
 
+    @Override
+    public boolean onDroppedByPlayer(ItemStack item, Player player) {
+        removeTags(item.getOrCreateTag());
+
+        return true;
+    }
+
+    public static Optional<String> getTarget(CompoundTag tag) {
+        boolean hasTarget = tag.contains(TAG_TARGET);
+
+        if (hasTarget) {
+            return Optional.of(tag.getString(TAG_TARGET));
+        }
+
+        return Optional.empty();
+    }
+
     private static Optional<ResourceKey<Level>> getTargetDimension(CompoundTag tag) {
         return Level.RESOURCE_KEY_CODEC.parse(NbtOps.INSTANCE, tag.get(TAG_TARGET_DIMENSION)).result();
     }
 
-    @Nullable
-    public static GlobalPos getTargetPosition(CompoundTag tag) {
+    public static Optional<GlobalPos> getTargetPosition(CompoundTag tag) {
         boolean hasTargetPos = tag.contains(TAG_TARGET_POS);
         boolean hasTargetDimension = tag.contains(TAG_TARGET_DIMENSION);
 
@@ -65,30 +109,29 @@ public class GoldenCompassItem extends Item implements Vanishable {
             Optional<ResourceKey<Level>> dimension = getTargetDimension(tag);
 
             if (dimension.isPresent()) {
-                return GlobalPos.of(dimension.get(), targetPos);
+                return Optional.of(GlobalPos.of(dimension.get(), targetPos));
             }
         }
 
-        return null;
+        return Optional.empty();
     }
 
-    @Nullable
-    public static String getTarget(CompoundTag tag) {
-        boolean hasTarget = tag.contains(TAG_TARGET);
-
-        if (hasTarget) {
-            return tag.getString(TAG_TARGET);
-        }
-
-        return null;
+    public static void setTarget(CompoundTag tag, String target) {
+        tag.putString(TAG_TARGET, target);
     }
 
-    public static void addTags(CompoundTag tag, BlockPos targetPos, ResourceKey<Level> targetDimension) {
+    public static void updateTags(CompoundTag tag, BlockPos targetPos, ResourceKey<Level> targetDimension) {
         Optional<Tag> encodedDimension = Level.RESOURCE_KEY_CODEC.encodeStart(NbtOps.INSTANCE, targetDimension).result();
 
         if (encodedDimension.isPresent()) {
             tag.put(TAG_TARGET_POS, NbtUtils.writeBlockPos(targetPos));
             tag.put(TAG_TARGET_DIMENSION, encodedDimension.get());
         }
+    }
+
+    public static void removeTags(CompoundTag tag) {
+        tag.remove(TAG_TARGET);
+        tag.remove(TAG_TARGET_POS);
+        tag.remove(TAG_TARGET_DIMENSION);
     }
 }

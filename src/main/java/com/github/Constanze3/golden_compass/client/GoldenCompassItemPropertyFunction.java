@@ -11,7 +11,10 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.Optional;
 
 
 public class GoldenCompassItemPropertyFunction implements ClampedItemPropertyFunction {
@@ -21,17 +24,19 @@ public class GoldenCompassItemPropertyFunction implements ClampedItemPropertyFun
 
     @Override
     public float unclampedCall(
-            ItemStack goldenCompassStack,
+            @NotNull ItemStack itemStack,
             @Nullable ClientLevel clientLevel,
             @Nullable LivingEntity livingEntity,
             int i
     ) {
-        Entity entity = livingEntity != null ? livingEntity : goldenCompassStack.getEntityRepresentation();
+        assert(itemStack.getItem() instanceof GoldenCompassItem);
+
+        Entity entity = livingEntity != null ? livingEntity : itemStack.getEntityRepresentation();
         if (entity == null) {
             return 0.0F;
         } else {
             ClientLevel level = tryFetchLevelIfMissing(entity, clientLevel);
-            return level == null ? 0.0F : getCompassRotation(goldenCompassStack);
+            return level == null ? 0.0F : getCompassRotation(itemStack);
         }
     }
 
@@ -44,21 +49,23 @@ public class GoldenCompassItemPropertyFunction implements ClampedItemPropertyFun
         }
     }
 
-    private float getCompassRotation(ItemStack goldenCompassStack) {
-        GlobalPos targetPos =  GoldenCompassItem.getTargetPosition(goldenCompassStack.getOrCreateTag());
+    private float getCompassRotation(ItemStack itemStack) {
+        Optional<GlobalPos> targetPos =  GoldenCompassItem.getTargetPosition(itemStack.getOrCreateTag());
         LocalPlayer player = Minecraft.getInstance().player;
 
-        if (player != null && targetPos != null && targetPos.dimension() == player.level.dimension()) {
-            Vec3 pos = Vec3.atCenterOf(targetPos.pos());
-            double angle = Math.atan2(pos.z() - player.getZ(), pos.x() - player.getX());
+        if (player != null && targetPos.isPresent()) {
+            if (targetPos.get().dimension() == player.level.dimension()) {
+                Vec3 pos = Vec3.atCenterOf(targetPos.get().pos());
+                double angle = Math.atan2(pos.z() - player.getZ(), pos.x() - player.getX());
 
-            // -1 = -180, 1 = 180
-            double wrappedAngle = Mth.positiveModulo((float)(angle / 6.2831854820251465), 1.0F);
-            double wrappedVisualRotation = Mth.positiveModulo(
-                    player.getVisualRotationYInDegrees() / 360.0F, 1.0F
-            );
+                // 0 = -180, 1 = 180
+                double wrappedAngle = Mth.positiveModulo((float)(angle / 6.2831854820251465), 1.0F);
+                double wrappedVisualRotation = Mth.positiveModulo(
+                        player.getVisualRotationYInDegrees() / 360.0F, 1.0F
+                );
 
-            return (float)Mth.positiveModulo(wrappedAngle - wrappedVisualRotation - 0.25, 1.0F);
+                return (float)Mth.positiveModulo(wrappedAngle - wrappedVisualRotation - 0.25, 1.0F);
+            }
         }
 
         return 0.0F;
