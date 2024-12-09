@@ -18,9 +18,10 @@ import java.util.Optional;
 
 
 public class GoldenCompassItemPropertyFunction implements ClampedItemPropertyFunction {
-    public GoldenCompassItemPropertyFunction() {
+    private final CompassWobble wobble = new CompassWobble();
+    private final CompassWobble wobbleRandom = new CompassWobble();
 
-    }
+    public GoldenCompassItemPropertyFunction() {}
 
     @Override
     public float unclampedCall(
@@ -36,7 +37,7 @@ public class GoldenCompassItemPropertyFunction implements ClampedItemPropertyFun
             return 0.0F;
         } else {
             ClientLevel level = tryFetchLevelIfMissing(entity, clientLevel);
-            return level == null ? 0.0F : getCompassRotation(itemStack);
+            return level == null ? 0.0F : getCompassRotation(itemStack, level);
         }
     }
 
@@ -49,7 +50,9 @@ public class GoldenCompassItemPropertyFunction implements ClampedItemPropertyFun
         }
     }
 
-    private float getCompassRotation(ItemStack itemStack) {
+    private float getCompassRotation(ItemStack itemStack, ClientLevel level) {
+        long tick = level.getGameTime();
+
         Optional<GlobalPos> targetPos =  GoldenCompassItem.getTargetPosition(itemStack.getOrCreateTag());
         LocalPlayer player = Minecraft.getInstance().player;
 
@@ -59,15 +62,43 @@ public class GoldenCompassItemPropertyFunction implements ClampedItemPropertyFun
                 double angle = Math.atan2(pos.z() - player.getZ(), pos.x() - player.getX());
 
                 // 0 = -180, 1 = 180
-                double wrappedAngle = Mth.positiveModulo((float)(angle / 6.2831854820251465), 1.0F);
+                double wrappedAngle = Mth.positiveModulo(angle / 6.2831854820251465, 1.0);
                 double wrappedVisualRotation = Mth.positiveModulo(
-                        player.getVisualRotationYInDegrees() / 360.0F, 1.0F
+                        player.getVisualRotationYInDegrees() / 360.0F, 1.0
                 );
 
-                return (float)Mth.positiveModulo(wrappedAngle - wrappedVisualRotation - 0.25, 1.0F);
+                if (this.wobble.shouldUpdate(tick)) {
+                    this.wobble.update(tick, 0.5 - (wrappedVisualRotation - 0.25));
+                }
+
+                return (float)Mth.positiveModulo(
+                        wrappedAngle + this.wobble.rotation,
+                        1.0F
+                );
             }
         }
 
         return 0.0F;
+    }
+
+    static class CompassWobble {
+        double rotation;
+        private double deltaRotation;
+        private long lastUpdateTick;
+
+        CompassWobble() {}
+
+        boolean shouldUpdate(long tick) {
+            return this.lastUpdateTick != tick;
+        }
+
+        void update(long tick, double targetRotation) {
+            this.lastUpdateTick = tick;
+            double diff = Mth.positiveModulo(targetRotation - this.rotation, 1);
+            diff = Mth.positiveModulo(diff + 0.5, 1.0) - 0.5;
+            this.deltaRotation += diff * 0.1;
+            this.deltaRotation *= 0.8;
+            this.rotation = Mth.positiveModulo(this.rotation + this.deltaRotation, 1.0);
+        }
     }
 }
