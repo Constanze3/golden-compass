@@ -25,7 +25,7 @@ public class Main
 
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, MODID);
     public static final RegistryObject<Item> GOLDEN_COMPASS = ITEMS.register("golden_compass",
-            () -> new GoldenCompassItem(new Item.Properties().tab(CreativeModeTab.TAB_MISC)));
+            () -> new GoldenCompassItem(new Item.Properties().tab(CreativeModeTab.TAB_MISC).stacksTo(1)));
 
     public Main()
     {
