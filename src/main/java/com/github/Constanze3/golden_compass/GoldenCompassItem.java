@@ -1,6 +1,5 @@
 package com.github.Constanze3.golden_compass;
 
-import com.mojang.logging.LogUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.nbt.*;
@@ -16,7 +15,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Vanishable;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
 
 import java.util.Optional;
 
@@ -24,6 +22,7 @@ public class GoldenCompassItem extends Item implements Vanishable {
     public static final String TAG_TARGET = "Target";
     public static final String TAG_TARGET_POS = "TargetPos";
     public static final String TAG_TARGET_DIMENSION = "TargetDimension";
+    public static final String TAG_TARGET_OFFLINE = "TargetOffline";
 
     public GoldenCompassItem(Properties properties) {
         super(properties);
@@ -67,9 +66,10 @@ public class GoldenCompassItem extends Item implements Vanishable {
                 BlockPos targetPos = targetPlayer.blockPosition();
                 ResourceKey<Level> targetDimension = targetPlayer.level.dimension();
 
-                updateTags(tag, targetPos, targetDimension);
+                setTargetOffline(tag, false);
+                setTargetPos(tag, targetPos, targetDimension);
             } else {
-                // removeTags(tag);
+                setTargetOffline(tag, true);
             }
         }
     }
@@ -116,11 +116,19 @@ public class GoldenCompassItem extends Item implements Vanishable {
         return Optional.empty();
     }
 
+    public static boolean getTargetOffline(CompoundTag tag) {
+        if (tag.contains(TAG_TARGET_OFFLINE)) {
+            return tag.getBoolean(TAG_TARGET_OFFLINE);
+        }
+
+        return false;
+    }
+
     public static void setTarget(CompoundTag tag, String target) {
         tag.putString(TAG_TARGET, target);
     }
 
-    public static void updateTags(CompoundTag tag, BlockPos targetPos, ResourceKey<Level> targetDimension) {
+    public static void setTargetPos(CompoundTag tag, BlockPos targetPos, ResourceKey<Level> targetDimension) {
         Optional<Tag> encodedDimension = Level.RESOURCE_KEY_CODEC.encodeStart(NbtOps.INSTANCE, targetDimension).result();
 
         if (encodedDimension.isPresent()) {
@@ -129,9 +137,14 @@ public class GoldenCompassItem extends Item implements Vanishable {
         }
     }
 
+    public static void setTargetOffline(CompoundTag tag, boolean value) {
+        tag.putBoolean(TAG_TARGET_OFFLINE, value);
+    }
+
     public static void removeTags(CompoundTag tag) {
         tag.remove(TAG_TARGET);
         tag.remove(TAG_TARGET_POS);
         tag.remove(TAG_TARGET_DIMENSION);
+        tag.remove(TAG_TARGET_OFFLINE);
     }
 }

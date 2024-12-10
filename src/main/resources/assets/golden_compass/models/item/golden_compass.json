@@ -4,6 +4,7 @@
     "layer0": "golden_compass:item/golden_compass_32"
   },
   "overrides": [
+    { "predicate": { "tracking": 0.5 }, "model": "golden_compass:item/golden_compass_33" },
     { "predicate": { "tracking": 1, "angle": 0.000000 }, "model": "golden_compass:item/golden_compass_16" },
     { "predicate": { "tracking": 1, "angle": 0.015625 }, "model": "golden_compass:item/golden_compass_17" },
     { "predicate": { "tracking": 1, "angle": 0.046875 }, "model": "golden_compass:item/golden_compass_18" },
