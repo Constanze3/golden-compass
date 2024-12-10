@@ -1,10 +1,13 @@
 package com.github.Constanze3.golden_compass;
 
+import net.minecraft.client.resources.sounds.Sound;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.nbt.*;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
@@ -38,6 +41,17 @@ public class GoldenCompassItem extends Item implements Vanishable {
         if (entity instanceof Player otherPlayer) {
             setTarget(itemStack.getOrCreateTag(), otherPlayer.getName().getString());
             player.setItemInHand(hand, itemStack);
+
+            player.getLevel().playSeededSound(
+                    null,
+                    entity,
+                    SoundEvents.ANVIL_PLACE,
+                    SoundSource.PLAYERS,
+                    1.0F,
+                    1.0F,
+                    42
+            );
+
             return InteractionResult.SUCCESS;
         }
 

@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.item.ClampedItemPropertyFunction;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
@@ -37,7 +38,7 @@ public class GoldenCompassItemPropertyFunction implements ClampedItemPropertyFun
             return 0.0F;
         } else {
             ClientLevel level = tryFetchLevelIfMissing(entity, clientLevel);
-            return level == null ? 0.0F : getCompassRotation(itemStack, level);
+            return level == null ? 0.0F : getCompassRotation(itemStack, level, i);
         }
     }
 
@@ -50,7 +51,7 @@ public class GoldenCompassItemPropertyFunction implements ClampedItemPropertyFun
         }
     }
 
-    private float getCompassRotation(ItemStack itemStack, ClientLevel level) {
+    private float getCompassRotation(ItemStack itemStack, ClientLevel level, int i) {
         long tick = level.getGameTime();
 
         Optional<GlobalPos> targetPos =  GoldenCompassItem.getTargetPosition(itemStack.getOrCreateTag());
@@ -58,27 +59,45 @@ public class GoldenCompassItemPropertyFunction implements ClampedItemPropertyFun
 
         if (player != null && targetPos.isPresent()) {
             if (targetPos.get().dimension() == player.level.dimension()) {
-                Vec3 pos = Vec3.atCenterOf(targetPos.get().pos());
-                double angle = Math.atan2(pos.z() - player.getZ(), pos.x() - player.getX());
-
-                // 0 = -180, 1 = 180
-                double wrappedAngle = Mth.positiveModulo(angle / 6.2831854820251465, 1.0);
-                double wrappedVisualRotation = Mth.positiveModulo(
-                        player.getVisualRotationYInDegrees() / 360.0F, 1.0
-                );
-
-                if (this.wobble.shouldUpdate(tick)) {
-                    this.wobble.update(tick, 0.5 - (wrappedVisualRotation - 0.25));
-                }
-
-                return (float)Mth.positiveModulo(
-                        wrappedAngle + this.wobble.rotation,
-                        1.0F
-                );
+                return getRotationTowardsTarget(player, targetPos.get().pos(), tick);
+            } else {
+                return getRandomlySpinningRotation(i, tick);
             }
         }
 
         return 0.0F;
+    }
+
+    private float getRandomlySpinningRotation(int i, long tick) {
+        if (this.wobbleRandom.shouldUpdate(tick)) {
+            this.wobbleRandom.update(tick, Math.random());
+        }
+
+        double rotation = this.wobbleRandom.rotation + (double)((float)this.hash(i) / 2.1474836E9F);
+        return Mth.positiveModulo((float)rotation, 1.0F);
+    }
+
+    private int hash(int p_234935_) {
+        return p_234935_ * 1327217883;
+    }
+
+    private float getRotationTowardsTarget(LocalPlayer player, BlockPos targetPos, long tick) {
+        Vec3 pos = Vec3.atCenterOf(targetPos);
+        double angle = Math.atan2(pos.z() - player.getZ(), pos.x() - player.getX()) / 6.2831854820251465;
+
+        // 0 = -180, 1 = 180
+        double wrappedVisualRotation = Mth.positiveModulo(
+                player.getVisualRotationYInDegrees() / 360.0F, 1.0
+        );
+
+        if (this.wobble.shouldUpdate(tick)) {
+            this.wobble.update(tick, 0.5 - (wrappedVisualRotation - 0.25));
+        }
+
+        return (float)Mth.positiveModulo(
+                angle + this.wobble.rotation,
+                1.0F
+        );
     }
 
     static class CompassWobble {
